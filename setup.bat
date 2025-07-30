@@ -4,7 +4,7 @@ echo ================================================
 
 echo.
 echo Installing server dependencies...
-cd server
+cd .\server
 call npm install
 if errorlevel 1 (
     echo ERROR: Failed to install server dependencies
