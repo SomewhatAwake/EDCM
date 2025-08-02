@@ -1,0 +1,122 @@
+buildscript {
+    ext {
+        buildToolsVersion = "36.0.0"
+        minSdkVersion = 26
+        compileSdkVersion = 36
+        targetSdkVersion = 36
+        ndkVersion = "25.1.8937393"
+        kotlinVersion = "1.8.21"
+        FLIPPER_VERSION = '0.125.0'
+    }
+    repositories {
+        google()
+        mavenCentral()
+    }
+    dependencies {
+        classpath("com.android.tools.build:gradle:7.4.2")
+        classpath("org.jetbrains.kotlin:kotlin-gradle-plugin:$kotlinVersion")
+    }
+}
+
+allprojects {
+    repositories {
+        google()
+        mavenCentral()
+        maven { url 'https://www.jitpack.io' }
+        maven { url 'https://maven.google.com' }
+        maven { url "https://oss.sonatype.org/content/repositories/snapshots/" }
+        // React Native dependency resolution
+        maven { url '../node_modules/react-native/android' }
+    }
+    
+    configurations.all {
+        resolutionStrategy {
+            // Force compatible AndroidX versions for API 36
+            force 'androidx.core:core:1.12.0'
+            force 'androidx.core:core-ktx:1.12.0'
+            force 'androidx.appcompat:appcompat:1.7.0'
+            force 'androidx.fragment:fragment:1.6.2'
+            force 'androidx.activity:activity:1.8.2'
+            force 'androidx.lifecycle:lifecycle-runtime:2.7.0'
+            force 'androidx.lifecycle:lifecycle-viewmodel:2.7.0'
+            force 'androidx.savedstate:savedstate:1.2.1'
+            
+            // Force compatible material design versions
+            force 'com.google.android.material:material:1.11.0'
+            
+            // Force React Native dependency resolution for 0.71.8
+            dependencySubstitution {
+                substitute module('com.facebook.react:react-android') using module('com.facebook.react:react-native:0.71.8')
+            }
+        }
+    }
+    
+    afterEvaluate { project ->
+        if (project.hasProperty("android")) {
+            android {
+                // Set namespace for libraries that don't have one
+                if (namespace == null) {
+                    switch (project.name) {
+                        case 'react-native-sound':
+                            namespace = "com.zmxv.RNSound"
+                            break
+                        case 'react-native-linear-gradient':
+                            namespace = "com.BV.LinearGradient"
+                            break
+                        case 'react-native-orientation-locker':
+                            namespace = "org.wonday.orientation"
+                            break
+                        case 'react-native-vector-icons':
+                            namespace = "com.oblador.vectoricons"
+                            break
+                        case 'react-native-gesture-handler':
+                            namespace = "com.swmansion.gesturehandler"
+                            break
+                        case 'react-native-screens':
+                            namespace = "com.swmansion.rnscreens"
+                            break
+                        case 'react-native-safe-area-context':
+                            namespace = "com.th3rdwave.safeareacontext"
+                            break
+                        case 'react-native-svg':
+                            namespace = "com.horcrux.svg"
+                            break
+                        case 'react-native-async-storage_async-storage':
+                            namespace = "com.reactnativecommunity.asyncstorage"
+                            break
+                        default:
+                            namespace = "com.${project.name.replace('-', '_')}"
+                            break
+                    }
+                }
+                
+                // Force all subprojects to use our build tools version
+                buildToolsVersion rootProject.ext.buildToolsVersion
+                compileSdkVersion rootProject.ext.compileSdkVersion
+                
+                defaultConfig {
+                    minSdkVersion rootProject.ext.minSdkVersion
+                    targetSdkVersion rootProject.ext.targetSdkVersion
+                }
+                
+                // Enable BuildConfig generation for all modules
+                buildFeatures {
+                    buildConfig true
+                }
+                
+                // Set Java compatibility for all modules
+                compileOptions {
+                    sourceCompatibility JavaVersion.VERSION_11
+                    targetCompatibility JavaVersion.VERSION_11
+                }
+                
+                // Set Kotlin JVM target
+                if (project.hasProperty("kotlin")) {
+                    kotlinOptions {
+                        jvmTarget = "11"
+                    }
+                }
+            }
+        }
+    }
+}

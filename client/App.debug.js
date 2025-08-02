@@ -1,14 +1,7 @@
 import React from 'react';
-import {View, Text, StyleSheet, Alert} from 'react-native';
+import {View, Text, StyleSheet} from 'react-native';
 
 const App = () => {
-  console.log('App component rendering...');
-  
-  React.useEffect(() => {
-    console.log('App mounted successfully!');
-    Alert.alert('Debug', 'App started successfully!');
-  }, []);
-
   return (
     <View style={styles.container}>
       <Text style={styles.text}>Elite Dangerous Carrier Manager</Text>

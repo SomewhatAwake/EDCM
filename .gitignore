@@ -105,7 +105,9 @@ client/*.orig.*
 client/web-build/
 
 # Android/IJ
-client/android/
+client/android/app/build/
+client/android/.gradle/
+client/android/build/
 client/.idea
 client/.gradle
 client/local.properties
