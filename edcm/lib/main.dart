@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 
 void main() {
   runApp(const EDCMApp());
@@ -724,12 +725,22 @@ class CarrierControlPage extends StatelessWidget {
                       color: const Color(0xFFFF6600),
                       size: 32,
                     )
-                  : Image.asset(
-                      icon,
-                      width: 32,
-                      height: 32,
-                      color: const Color(0xFFFF6600),
-                    ),
+                  : icon.toString().endsWith('.svg')
+                      ? SvgPicture.asset(
+                          icon,
+                          width: 32,
+                          height: 32,
+                          colorFilter: const ColorFilter.mode(
+                            Color(0xFFFF6600),
+                            BlendMode.srcIn,
+                          ),
+                        )
+                      : Image.asset(
+                          icon,
+                          width: 32,
+                          height: 32,
+                          color: const Color(0xFFFF6600),
+                        ),
               const SizedBox(height: 8),
               Text(
                 title,
@@ -955,12 +966,22 @@ class CarrierServicesPage extends StatelessWidget {
                         color: const Color(0xFFFF6600),
                         size: 20,
                       )
-                    : Image.asset(
-                        icon,
-                        width: 20,
-                        height: 20,
-                        color: const Color(0xFFFF6600),
-                      ),
+                    : icon.toString().endsWith('.svg')
+                        ? SvgPicture.asset(
+                            icon,
+                            width: 20,
+                            height: 20,
+                            colorFilter: const ColorFilter.mode(
+                              Color(0xFFFF6600),
+                              BlendMode.srcIn,
+                            ),
+                          )
+                        : Image.asset(
+                            icon,
+                            width: 20,
+                            height: 20,
+                            color: const Color(0xFFFF6600),
+                          ),
                 const Spacer(),
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
