@@ -91,34 +91,6 @@ data/
 logs/
 *.log
 
-# React Native
-client/node_modules/
-client/.expo/
-client/dist/
-client/npm-debug.*
-client/*.jks
-client/*.p8
-client/*.p12
-client/*.key
-client/*.mobileprovision
-client/*.orig.*
-client/web-build/
-
-# Android/IJ
-client/android/app/build/
-client/android/.gradle/
-client/android/build/
-client/.idea
-client/.gradle
-client/local.properties
-client/*.iml
-
-# iOS
-client/ios/Pods/
-client/ios/build/
-client/ios/*.xcworkspace
-client/ios/*.xcuserdata
-
 # macOS
 .DS_Store
 
