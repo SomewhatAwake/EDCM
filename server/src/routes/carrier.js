@@ -66,7 +66,7 @@ router.get('/:callsign', async (req, res) => {
 router.put('/:callsign/docking', async (req, res) => {
   try {
     const { callsign } = req.params;
-    const { dockingAccess, notoriousAccess } = req.body;
+    const { docking_access: dockingAccess, notorious_access: notoriousAccess } = req.body;
 
     // Check if carrier exists
     const carrier = await database.get(
@@ -262,6 +262,90 @@ router.put('/:callsign/name', async (req, res) => {
   } catch (error) {
     console.error('Error updating carrier name:', error);
     res.status(500).json({ error: 'Failed to update carrier name' });
+  }
+});
+
+// Get automation system status
+router.get('/automation/status', async (req, res) => {
+  try {
+    const status = await carrierService.getAutomationStatus();
+    res.json(status);
+  } catch (error) {
+    console.error('Error getting automation status:', error);
+    res.status(500).json({ error: 'Failed to get automation status' });
+  }
+});
+
+// Get current carrier information from game UI (via OCR)
+router.get('/:callsign/game-info', async (req, res) => {
+  try {
+    const { callsign } = req.params;
+
+    // Check if carrier exists
+    const carrier = await database.get(
+      'SELECT id FROM carriers WHERE id = ?',
+      [callsign]
+    );
+
+    if (!carrier) {
+      return res.status(404).json({ error: 'Carrier not found' });
+    }
+
+    const gameInfo = await carrierService.getCarrierInfoFromGame();
+    
+    if (!gameInfo) {
+      return res.status(503).json({ 
+        error: 'Unable to read carrier information from game',
+        reason: 'Elite Dangerous may not be running or automation not available'
+      });
+    }
+
+    res.json({
+      carrierId: callsign,
+      gameData: gameInfo,
+      timestamp: new Date().toISOString()
+    });
+
+  } catch (error) {
+    console.error('Error getting carrier info from game:', error);
+    res.status(500).json({ error: 'Failed to get carrier info from game' });
+  }
+});
+
+// Detect current Elite Dangerous UI state
+router.get('/automation/game-state', async (req, res) => {
+  try {
+    const state = await carrierService.detectGameState();
+    res.json({
+      state: state.state,
+      confidence: state.confidence,
+      timestamp: new Date().toISOString()
+    });
+  } catch (error) {
+    console.error('Error detecting game state:', error);
+    res.status(500).json({ error: 'Failed to detect game state' });
+  }
+});
+
+// Enable/disable automation
+router.post('/automation/toggle', async (req, res) => {
+  try {
+    const { enabled } = req.body;
+
+    if (typeof enabled !== 'boolean') {
+      return res.status(400).json({ error: 'enabled must be a boolean value' });
+    }
+
+    carrierService.setAutomationEnabled(enabled);
+
+    res.json({
+      message: `Automation ${enabled ? 'enabled' : 'disabled'}`,
+      enabled
+    });
+
+  } catch (error) {
+    console.error('Error toggling automation:', error);
+    res.status(500).json({ error: 'Failed to toggle automation' });
   }
 });
 

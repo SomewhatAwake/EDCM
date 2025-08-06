@@ -3,6 +3,7 @@ const path = require('path');
 const winston = require('winston');
 const { exec } = require('child_process');
 const util = require('util');
+const CarrierAutomation = require('../automation/CarrierAutomation');
 
 const execAsync = util.promisify(exec);
 
@@ -22,6 +23,8 @@ const logger = winston.createLogger({
 class CarrierService {
   constructor() {
     this.edInstallPath = process.env.ED_INSTALL_PATH;
+    this.automation = new CarrierAutomation();
+    this.automationEnabled = process.env.ENABLE_ED_AUTOMATION === 'true';
   }
 
   async updateDockingPermissions(carrierId, dockingAccess, notoriousAccess) {
@@ -37,20 +40,27 @@ class CarrierService {
         throw new Error('Elite Dangerous is not running');
       }
 
-      // Real implementation would:
-      // 1. Focus Elite Dangerous window
-      // 2. Open carrier management (likely Right Panel -> Carrier)
-      // 3. Navigate to Docking permissions
-      // 4. Change settings via keystrokes
-      
-      // For now, we'll simulate but show what real implementation needs
-      if (process.env.NODE_ENV === 'development') {
-        logger.warn('SIMULATION MODE: Would send key sequence to Elite Dangerous');
-        logger.info(`Would execute: Focus ED -> Right Panel -> Carrier -> Docking -> Set ${dockingAccess}`);
-        await this.simulateDelay(2000); // Simulate operation time
+      // Use real automation if enabled, otherwise simulate
+      if (this.automationEnabled) {
+        logger.info('Using Elite Dangerous automation for docking permissions');
+        
+        // Focus Elite Dangerous window first
+        await this.focusEliteDangerous();
+        await this.simulateDelay(1000);
+
+        // Use automation system to update docking permissions
+        const success = await this.automation.updateDockingPermissions(dockingAccess, notoriousAccess);
+        
+        if (!success) {
+          throw new Error('Automation failed to update docking permissions');
+        }
+
+        logger.info('Docking permissions updated successfully via automation');
       } else {
-        // Real implementation would go here
-        await this.executeCarrierDockingChange(dockingAccess, notoriousAccess);
+        // Simulation mode for development/testing
+        logger.warn('SIMULATION MODE: Would execute docking permissions change');
+        logger.info(`Would execute: Focus ED -> Right Panel -> Carrier -> Docking -> Set ${dockingAccess}, Notorious: ${notoriousAccess}`);
+        await this.simulateDelay(2000); // Simulate operation time
       }
 
       return true;
@@ -64,11 +74,33 @@ class CarrierService {
     try {
       logger.info(`Initiating jump for carrier ${carrierId} to ${targetSystem}`);
 
-      // Simulate command execution
-      await this.simulateCarrierCommand('jump', {
-        carrierId,
-        targetSystem
-      });
+      // Check if Elite Dangerous is running
+      const isGameRunning = await this.isEliteDangerousRunning();
+      if (!isGameRunning) {
+        throw new Error('Elite Dangerous is not running');
+      }
+
+      // Use real automation if enabled
+      if (this.automationEnabled) {
+        logger.info('Using Elite Dangerous automation for carrier jump');
+        
+        await this.focusEliteDangerous();
+        await this.simulateDelay(1000);
+
+        const success = await this.automation.initiateJump(targetSystem);
+        
+        if (!success) {
+          throw new Error('Automation failed to initiate jump');
+        }
+
+        logger.info(`Jump to ${targetSystem} initiated successfully via automation`);
+      } else {
+        // Simulate command execution
+        await this.simulateCarrierCommand('jump', {
+          carrierId,
+          targetSystem
+        });
+      }
 
       return true;
     } catch (error) {
@@ -81,12 +113,34 @@ class CarrierService {
     try {
       logger.info(`Updating service ${serviceType} for carrier ${carrierId}:`, enabled);
 
-      // Simulate command execution
-      await this.simulateCarrierCommand('service_update', {
-        carrierId,
-        serviceType,
-        enabled
-      });
+      // Check if Elite Dangerous is running
+      const isGameRunning = await this.isEliteDangerousRunning();
+      if (!isGameRunning) {
+        throw new Error('Elite Dangerous is not running');
+      }
+
+      // Use real automation if enabled
+      if (this.automationEnabled) {
+        logger.info('Using Elite Dangerous automation for service update');
+        
+        await this.focusEliteDangerous();
+        await this.simulateDelay(1000);
+
+        const success = await this.automation.updateService(serviceType, enabled);
+        
+        if (!success) {
+          throw new Error('Automation failed to update service');
+        }
+
+        logger.info(`Service ${serviceType} updated successfully via automation`);
+      } else {
+        // Simulate command execution
+        await this.simulateCarrierCommand('service_update', {
+          carrierId,
+          serviceType,
+          enabled
+        });
+      }
 
       return true;
     } catch (error) {
@@ -160,8 +214,27 @@ class CarrierService {
   // Check if Elite Dangerous is currently running
   async isEliteDangerousRunning() {
     try {
-      const { stdout } = await execAsync('tasklist /FI "IMAGENAME eq EliteDangerous64.exe" /NH');
-      return stdout.includes('EliteDangerous64.exe');
+      // In mock mode, always return true
+      if (process.env.MOCK_MODE === 'true') {
+        return true;
+      }
+
+      // Cross-platform process detection
+      const isWindows = process.platform === 'win32';
+      
+      if (isWindows) {
+        const { stdout } = await execAsync('tasklist /FI "IMAGENAME eq EliteDangerous64.exe" /NH');
+        return stdout.includes('EliteDangerous64.exe');
+      } else {
+        // On Linux/Mac, use ps command to look for Elite Dangerous
+        try {
+          const { stdout } = await execAsync('ps aux | grep -i "elite"');
+          return stdout.includes('Elite') || stdout.includes('elite');
+        } catch (error) {
+          // If ps command fails, assume ED is not running
+          return false;
+        }
+      }
     } catch (error) {
       logger.error('Failed to check if Elite Dangerous is running:', error);
       return false;
@@ -239,6 +312,80 @@ class CarrierService {
   // Helper for delays
   async simulateDelay(ms) {
     return new Promise(resolve => setTimeout(resolve, ms));
+  }
+
+  // Get automation system status
+  async getAutomationStatus() {
+    try {
+      if (!this.automation) {
+        return { available: false, reason: 'Automation not initialized' };
+      }
+
+      const status = this.automation.getStatus();
+      return {
+        available: this.automationEnabled,
+        enabled: this.automationEnabled,
+        ...status
+      };
+    } catch (error) {
+      logger.error('Failed to get automation status:', error);
+      return { available: false, reason: error.message };
+    }
+  }
+
+  // Get current carrier information via automation (OCR)
+  async getCarrierInfoFromGame() {
+    try {
+      if (!this.automationEnabled || !this.automation) {
+        throw new Error('Automation not available');
+      }
+
+      const isGameRunning = await this.isEliteDangerousRunning();
+      if (!isGameRunning) {
+        throw new Error('Elite Dangerous is not running');
+      }
+
+      await this.focusEliteDangerous();
+      await this.simulateDelay(1000);
+
+      const info = await this.automation.getCarrierInfo();
+      return info;
+    } catch (error) {
+      logger.error('Failed to get carrier info from game:', error);
+      return null;
+    }
+  }
+
+  // Detect current Elite Dangerous UI state
+  async detectGameState() {
+    try {
+      if (!this.automationEnabled || !this.automation) {
+        throw new Error('Automation not available');
+      }
+
+      const state = await this.automation.detectCurrentState();
+      return state;
+    } catch (error) {
+      logger.error('Failed to detect game state:', error);
+      return { state: 'unknown', confidence: 0 };
+    }
+  }
+
+  // Enable/disable automation
+  setAutomationEnabled(enabled) {
+    this.automationEnabled = enabled;
+    logger.info(`Automation ${enabled ? 'enabled' : 'disabled'}`);
+  }
+
+  // Cleanup automation resources
+  async cleanup() {
+    try {
+      if (this.automation) {
+        await this.automation.cleanup();
+      }
+    } catch (error) {
+      logger.error('Error during carrier service cleanup:', error);
+    }
   }
 }
 
