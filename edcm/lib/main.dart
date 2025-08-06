@@ -1,8 +1,17 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
+import 'package:provider/provider.dart';
+import 'providers/carrier_provider.dart';
+import 'screens/login_screen.dart';
+import 'models/carrier.dart';
 
 void main() {
-  runApp(const EDCMApp());
+  runApp(
+    ChangeNotifierProvider(
+      create: (context) => CarrierProvider(),
+      child: const EDCMApp(),
+    ),
+  );
 }
 
 class EDCMApp extends StatelessWidget {
@@ -47,7 +56,51 @@ class EDCMApp extends StatelessWidget {
           ),
         ),
       ),
-      home: const CarrierAdminOS(),
+      home: Consumer<CarrierProvider>(
+        builder: (context, provider, child) {
+          // Debug prints to see what's happening
+          print('DEBUG: carriers.length: ${provider.carriers.length}');
+          print('DEBUG: isLoading: ${provider.isLoading}');
+          print('DEBUG: error: ${provider.error}');
+          
+          // Show loading indicator while carriers are being loaded
+          if (provider.carriers.isEmpty && provider.isLoading) {
+            print('DEBUG: Showing loading screen');
+            return const Scaffold(
+              backgroundColor: Color(0xFF000000),
+              body: Center(
+                child: CircularProgressIndicator(
+                  valueColor: AlwaysStoppedAnimation<Color>(Color(0xFFFF6600)),
+                ),
+              ),
+            );
+          }
+          
+          // Show connection screen only if no carriers loaded AND there's an error 
+          // (meaning the auto-load failed and user needs to manually connect)
+          if (provider.carriers.isEmpty && provider.error != null && !provider.isLoading) {
+            print('DEBUG: Showing connection screen due to error: ${provider.error}');
+            return const ConnectionScreen();
+          }
+          
+          // If we have carriers, show the main interface
+          if (provider.carriers.isNotEmpty) {
+            print('DEBUG: Showing CarrierAdminOS with ${provider.carriers.length} carriers');
+            return const CarrierAdminOS();
+          }
+          
+          // Fallback to loading if none of the above conditions are met
+          print('DEBUG: Fallback to loading screen');
+          return const Scaffold(
+            backgroundColor: Color(0xFF000000),
+            body: Center(
+              child: CircularProgressIndicator(
+                valueColor: AlwaysStoppedAnimation<Color>(Color(0xFFFF6600)),
+              ),
+            ),
+          );
+        },
+      ),
     );
   }
 }
@@ -62,114 +115,182 @@ class CarrierAdminOS extends StatefulWidget {
 class _CarrierAdminOSState extends State<CarrierAdminOS> {
   int _selectedIndex = 0;
 
-  static const List<Widget> _pages = <Widget>[
-    CarrierOverviewPage(),
-    CarrierControlPage(),
-    CarrierServicesPage(),
-    SettingsPage(),
-  ];
-
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      body: Column(
-        children: [
-          // Safe area padding to avoid phone navbar conflicts
-          Container(
-            height: MediaQuery.of(context).padding.top,
-            color: const Color(0xFF000000),
-          ),
-          
-          // Top Header Bar (like ED AdminOS) - now includes stats
-          Container(
-            height: 80,
-            decoration: const BoxDecoration(
-              color: Color(0xFF0A0A0A),
-              border: Border(
-                bottom: BorderSide(color: Color(0xFF333333), width: 1),
+    return Consumer<CarrierProvider>(
+      builder: (context, provider, child) {
+        // Show loading while carriers are being fetched
+        if (provider.isLoading && provider.carriers.isEmpty) {
+          return const Scaffold(
+            backgroundColor: Color(0xFF000000),
+            body: Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  CircularProgressIndicator(
+                    valueColor: AlwaysStoppedAnimation<Color>(Color(0xFFFF6600)),
+                  ),
+                  SizedBox(height: 16),
+                  Text(
+                    'LOADING CARRIER DATA...',
+                    style: TextStyle(
+                      color: Color(0xFFFF6600),
+                      fontFamily: 'monospace',
+                      fontSize: 16,
+                    ),
+                  ),
+                ],
               ),
             ),
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16),
+          );
+        }
+
+        // Show error if no carriers available
+        if (provider.carriers.isEmpty && !provider.isLoading) {
+          return Scaffold(
+            backgroundColor: const Color(0xFF000000),
+            body: Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  const Icon(
+                    Icons.warning,
+                    color: Color(0xFFFF6600),
+                    size: 48,
+                  ),
+                  const SizedBox(height: 16),
+                  const Text(
+                    'NO CARRIERS FOUND',
+                    style: TextStyle(
+                      color: Color(0xFFFF6600),
+                      fontFamily: 'monospace',
+                      fontSize: 18,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  const Text(
+                    'Please ensure you have a Fleet Carrier\nregistered in Elite Dangerous.',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      color: Color(0xFFCCCCCC),
+                      fontFamily: 'monospace',
+                      fontSize: 12,
+                    ),
+                  ),
+                  const SizedBox(height: 24),
+                ],
+              ),
+            ),
+          );
+        }
+
+        final carrier = provider.selectedCarrier;
+        if (carrier == null) {
+          return const Scaffold(
+            backgroundColor: Color(0xFF000000),
+            body: Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(
+                    Icons.warning,
+                    color: Color(0xFFFF6600),
+                    size: 48,
+                  ),
+                  SizedBox(height: 16),
+                  Text(
+                    'NO CARRIER SELECTED',
+                    style: TextStyle(
+                      color: Color(0xFFFF6600),
+                      fontFamily: 'monospace',
+                      fontSize: 18,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          );
+        }
+
+        final List<Widget> pages = [
+          CarrierOverviewPage(carrier: carrier),
+          CarrierControlPage(carrier: carrier),
+          CarrierServicesPage(carrier: carrier),
+          const SettingsPage(),
+        ];
+
+        return Scaffold(
+          body: Column(
+            children: [
+              // Safe area padding to avoid phone navbar conflicts
+              Container(
+                height: MediaQuery.of(context).padding.top,
+                color: const Color(0xFF000000),
+              ),
+              
+              // Top Header Bar with real carrier data
+              _buildTopHeader(context, carrier, provider),
+              
+              // Navigation Bar
+              _buildNavigationBar(),
+              
+              // Main Content Area
+              Expanded(
+                child: pages.elementAt(_selectedIndex),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildTopHeader(BuildContext context, carrier, CarrierProvider provider) {
+    return Container(
+      height: 80,
+      decoration: const BoxDecoration(
+        color: Color(0xFF0A0A0A),
+        border: Border(
+          bottom: BorderSide(color: Color(0xFF333333), width: 1),
+        ),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16),
+        child: Row(
+          children: [
+            // Carrier Icon and Info
+            SizedBox(
+              width: 160,
               child: Row(
                 children: [
-                  // Carrier Icon and Info - fixed width
-                  SizedBox(
-                    width: 160,
-                    child: Row(
-                      children: [
-                        Image.asset(
-                          'assets/images/icons/carrier.png',
-                          width: 20,
-                          height: 20,
-                          color: const Color(0xFFFF6600),
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: Column(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              const Text(
-                                'AWAKEN DISTRO',
-                                style: TextStyle(
-                                  color: Color(0xFFFF6600),
-                                  fontFamily: 'monospace',
-                                  fontSize: 12,
-                                  fontWeight: FontWeight.w500,
-                                ),
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                              const Text(
-                                'WHQ-N3B',
-                                style: TextStyle(
-                                  color: Color(0xFF888888),
-                                  fontFamily: 'monospace',
-                                  fontSize: 10,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ],
-                    ),
+                  Image.asset(
+                    'assets/images/icons/carrier.png',
+                    width: 20,
+                    height: 20,
+                    color: const Color(0xFFFF6600),
                   ),
-                  
-                  // Quick Stats - flexible, now on separate lines
+                  const SizedBox(width: 12),
                   Expanded(
-                    child: Center(
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          _buildCompactStat('547.5M CR'),
-                          const SizedBox(height: 4),
-                          _buildCompactStat('LALANDE'),
-                        ],
-                      ),
-                    ),
-                  ),
-                  
-                  // Time Display - fixed width
-                  SizedBox(
-                    width: 80,
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
-                      crossAxisAlignment: CrossAxisAlignment.end,
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          '12:34:56',
+                          carrier?.name ?? 'UNKNOWN CARRIER',
                           style: const TextStyle(
-                            color: Color(0xFFCCCCCC),
+                            color: Color(0xFFFF6600),
                             fontFamily: 'monospace',
                             fontSize: 12,
+                            fontWeight: FontWeight.w500,
                           ),
+                          overflow: TextOverflow.ellipsis,
                         ),
                         Text(
-                          '4 AUG 3311',
+                          carrier?.id ?? 'XXX-XXX',
                           style: const TextStyle(
                             color: Color(0xFF888888),
                             fontFamily: 'monospace',
-                            fontSize: 9,
+                            fontSize: 10,
                           ),
                         ),
                       ],
@@ -178,31 +299,89 @@ class _CarrierAdminOSState extends State<CarrierAdminOS> {
                 ],
               ),
             ),
-          ),
-          
-          // Navigation Bar (horizontal instead of vertical sidebar)
-          Container(
-            height: 50,
-            decoration: const BoxDecoration(
-              color: Color(0xFF0A0A0A),
-              border: Border(
-                bottom: BorderSide(color: Color(0xFF333333), width: 1),
+            
+            // Quick Stats
+            Expanded(
+              child: Center(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    _buildCompactStat(carrier?.formattedBalance ?? '0 CR'),
+                    const SizedBox(height: 4),
+                    _buildCompactStat(carrier?.currentSystem ?? 'UNKNOWN'),
+                  ],
+                ),
               ),
             ),
-            child: Row(
-              children: [
-                _buildHorizontalNavItem(Icons.dashboard, 0, 'OVERVIEW'),
-                _buildHorizontalNavItem(Icons.control_camera, 1, 'CONTROL'),
-                _buildHorizontalNavItem(Icons.business, 2, 'SERVICES'),
-                _buildHorizontalNavItem(Icons.settings, 3, 'SETTINGS'),
-              ],
+            
+            // Time Display and Connection Status
+            SizedBox(
+              width: 120,
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.end,
+                    children: [
+                      Container(
+                        width: 8,
+                        height: 8,
+                        decoration: BoxDecoration(
+                          color: provider.isServerConnected 
+                            ? const Color(0xFF00FF00) 
+                            : const Color(0xFFFF0000),
+                          shape: BoxShape.circle,
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Text(
+                        provider.isServerConnected ? 'ONLINE' : 'OFFLINE',
+                        style: TextStyle(
+                          color: provider.isServerConnected 
+                            ? const Color(0xFF00FF00) 
+                            : const Color(0xFFFF0000),
+                          fontFamily: 'monospace',
+                          fontSize: 10,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    '${DateTime.now().hour.toString().padLeft(2, '0')}:'
+                    '${DateTime.now().minute.toString().padLeft(2, '0')}:'
+                    '${DateTime.now().second.toString().padLeft(2, '0')}',
+                    style: const TextStyle(
+                      color: Color(0xFFCCCCCC),
+                      fontFamily: 'monospace',
+                      fontSize: 12,
+                    ),
+                  ),
+                ],
+              ),
             ),
-          ),
-          
-          // Main Content Area (full width)
-          Expanded(
-            child: _pages.elementAt(_selectedIndex),
-          ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildNavigationBar() {
+    return Container(
+      height: 50,
+      decoration: const BoxDecoration(
+        color: Color(0xFF0A0A0A),
+        border: Border(
+          bottom: BorderSide(color: Color(0xFF333333), width: 1),
+        ),
+      ),
+      child: Row(
+        children: [
+          _buildHorizontalNavItem(Icons.dashboard, 0, 'OVERVIEW'),
+          _buildHorizontalNavItem(Icons.control_camera, 1, 'CONTROL'),
+          _buildHorizontalNavItem(Icons.business, 2, 'SERVICES'),
+          _buildHorizontalNavItem(Icons.settings, 3, 'SETTINGS'),
         ],
       ),
     );
@@ -289,10 +468,25 @@ class _CarrierAdminOSState extends State<CarrierAdminOS> {
 
 // Carrier Overview Page
 class CarrierOverviewPage extends StatelessWidget {
-  const CarrierOverviewPage({super.key});
+  final dynamic carrier; // Will be properly typed once we generate the models
+  
+  const CarrierOverviewPage({super.key, required this.carrier});
 
   @override
   Widget build(BuildContext context) {
+    if (carrier == null) {
+      return const Center(
+        child: Text(
+          'NO CARRIER SELECTED',
+          style: TextStyle(
+            color: Color(0xFFFF6600),
+            fontFamily: 'monospace',
+            fontSize: 16,
+          ),
+        ),
+      );
+    }
+
     return Container(
       color: const Color(0xFF000000),
       padding: const EdgeInsets.all(20),
@@ -339,9 +533,9 @@ class CarrierOverviewPage extends StatelessWidget {
                               ),
                             ),
                             const SizedBox(height: 16),
-                            const Text(
-                              'AWAKEN DISTRO CENTRE',
-                              style: TextStyle(
+                            Text(
+                              carrier?.name?.toUpperCase() ?? 'UNKNOWN CARRIER',
+                              style: const TextStyle(
                                 color: Color(0xFFFF6600),
                                 fontFamily: 'monospace',
                                 fontSize: 18,
@@ -349,9 +543,9 @@ class CarrierOverviewPage extends StatelessWidget {
                               ),
                               textAlign: TextAlign.center,
                             ),
-                            const Text(
-                              'WHQ-N3B',
-                              style: TextStyle(
+                            Text(
+                              carrier?.id ?? 'XXX-XXX',
+                              style: const TextStyle(
                                 color: Color(0xFFCCCCCC),
                                 fontFamily: 'monospace',
                                 fontSize: 14,
@@ -372,189 +566,212 @@ class CarrierOverviewPage extends StatelessWidget {
           
           // Right side - Status panels
           SizedBox(
-            width: 250, // Reduced width to give more space to the left side
+            width: 200, // Reduced from 250 to give more space to the left side
             child: Column(
               children: [
                 // System Status
-                Container(
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    border: Border.all(color: const Color(0xFF333333), width: 1),
-                    color: const Color(0xFF0A0A0A),
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'SYSTEM STATUS',
-                        style: const TextStyle(
-                          color: Color(0xFFFF6600),
-                          fontFamily: 'monospace',
-                          fontSize: 12,
-                          fontWeight: FontWeight.w500,
+                SizedBox(
+                  width: double.infinity,
+                  child: Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      border: Border.all(color: const Color(0xFF333333), width: 1),
+                      color: const Color(0xFF0A0A0A),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text(
+                          'SYSTEM STATUS',
+                          style: TextStyle(
+                            color: Color(0xFFFF6600),
+                            fontFamily: 'monospace',
+                            fontSize: 12,
+                            fontWeight: FontWeight.w500,
+                          ),
                         ),
-                      ),
-                      const SizedBox(height: 12),
-                      Row(
-                        children: [
-                          Container(
-                            width: 8,
-                            height: 8,
-                            decoration: const BoxDecoration(
-                              color: Color(0xFF00FF00),
-                              shape: BoxShape.circle,
-                            ),
-                          ),
-                          const SizedBox(width: 8),
-                          Expanded(
-                            child: Text(
-                              'ALL SYSTEMS OPERATIONAL',
-                              style: const TextStyle(
+                        const SizedBox(height: 12),
+                        Row(
+                          children: [
+                            Container(
+                              width: 8,
+                              height: 8,
+                              decoration: const BoxDecoration(
                                 color: Color(0xFF00FF00),
-                                fontFamily: 'monospace',
-                                fontSize: 12,
+                                shape: BoxShape.circle,
                               ),
-                              overflow: TextOverflow.ellipsis,
                             ),
-                          ),
-                        ],
-                      ),
-                    ],
+                            const SizedBox(width: 8),
+                            const Expanded(
+                              child: Text(
+                                'OPERATIONAL',
+                                style: TextStyle(
+                                  color: Color(0xFF00FF00),
+                                  fontFamily: 'monospace',
+                                  fontSize: 12,
+                                ),
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
                   ),
                 ),
                 
                 const SizedBox(height: 16),
                 
                 // Fuel Status
-                Container(
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    border: Border.all(color: const Color(0xFF333333), width: 1),
-                    color: const Color(0xFF0A0A0A),
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'TRITIUM FUEL',
-                        style: const TextStyle(
-                          color: Color(0xFFFF6600),
-                          fontFamily: 'monospace',
-                          fontSize: 12,
-                          fontWeight: FontWeight.w500,
+                SizedBox(
+                  width: double.infinity,
+                  child: Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      border: Border.all(color: const Color(0xFF333333), width: 1),
+                      color: const Color(0xFF0A0A0A),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text(
+                          'TRITIUM FUEL',
+                          style: TextStyle(
+                            color: Color(0xFFFF6600),
+                            fontFamily: 'monospace',
+                            fontSize: 12,
+                            fontWeight: FontWeight.w500,
+                          ),
                         ),
-                      ),
-                      const SizedBox(height: 12),
-                      Text(
-                        '1000 / 1000 TONS',
-                        style: const TextStyle(
-                          color: Color(0xFFCCCCCC),
-                          fontFamily: 'monospace',
-                          fontSize: 14,
+                        const SizedBox(height: 12),
+                        Text(
+                          carrier?.fuelStatus ?? '0 / 1000 TONS',
+                          style: const TextStyle(
+                            color: Color(0xFFCCCCCC),
+                            fontFamily: 'monospace',
+                            fontSize: 14,
+                          ),
                         ),
-                      ),
-                      const SizedBox(height: 8),
-                      Container(
-                        height: 4,
-                        decoration: BoxDecoration(
-                          color: const Color(0xFF333333),
-                          borderRadius: BorderRadius.circular(2),
-                        ),
-                        child: FractionallySizedBox(
-                          widthFactor: 1.0,
-                          child: Container(
-                            decoration: BoxDecoration(
-                              color: const Color(0xFF00FF00),
-                              borderRadius: BorderRadius.circular(2),
+                        const SizedBox(height: 8),
+                        Container(
+                          height: 4,
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF333333),
+                            borderRadius: BorderRadius.circular(2),
+                          ),
+                          child: FractionallySizedBox(
+                            widthFactor: carrier?.fuelPercentage ?? 0.0,
+                            child: Container(
+                              decoration: BoxDecoration(
+                                color: const Color(0xFF00FF00),
+                                borderRadius: BorderRadius.circular(2),
+                              ),
                             ),
                           ),
                         ),
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
                 ),
                 
                 const SizedBox(height: 16),
                 
                 // Capacity Status
-                Container(
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    border: Border.all(color: const Color(0xFF333333), width: 1),
-                    color: const Color(0xFF0A0A0A),
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'CARGO CAPACITY',
-                        style: const TextStyle(
-                          color: Color(0xFFFF6600),
-                          fontFamily: 'monospace',
-                          fontSize: 12,
-                          fontWeight: FontWeight.w500,
+                SizedBox(
+                  width: double.infinity,
+                  child: Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      border: Border.all(color: const Color(0xFF333333), width: 1),
+                      color: const Color(0xFF0A0A0A),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text(
+                          'CARGO CAPACITY',
+                          style: TextStyle(
+                            color: Color(0xFFFF6600),
+                            fontFamily: 'monospace',
+                            fontSize: 12,
+                            fontWeight: FontWeight.w500,
+                          ),
                         ),
-                      ),
-                      const SizedBox(height: 12),
-                      Text(
-                        '930 / 25000 UNITS',
-                        style: const TextStyle(
-                          color: Color(0xFFCCCCCC),
-                          fontFamily: 'monospace',
-                          fontSize: 14,
+                        const SizedBox(height: 12),
+                        const Text(
+                          '930 / 25000 UNITS',
+                          style: TextStyle(
+                            color: Color(0xFFCCCCCC),
+                            fontFamily: 'monospace',
+                            fontSize: 14,
+                          ),
                         ),
-                      ),
-                      const SizedBox(height: 8),
-                      Container(
-                        height: 4,
-                        decoration: BoxDecoration(
-                          color: const Color(0xFF333333),
-                          borderRadius: BorderRadius.circular(2),
-                        ),
-                        child: FractionallySizedBox(
-                          widthFactor: 0.037, // 930/25000
-                          child: Container(
-                            decoration: BoxDecoration(
-                              color: const Color(0xFF00FFFF),
-                              borderRadius: BorderRadius.circular(2),
+                        const SizedBox(height: 8),
+                        Container(
+                          height: 4,
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF333333),
+                            borderRadius: BorderRadius.circular(2),
+                          ),
+                          child: FractionallySizedBox(
+                            widthFactor: 0.037, // 930/25000
+                            child: Container(
+                              decoration: BoxDecoration(
+                                color: const Color(0xFF00FFFF),
+                                borderRadius: BorderRadius.circular(2),
+                              ),
                             ),
                           ),
                         ),
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
                 ),
                 
                 const Spacer(),
                 
                 // Jump Status
-                Container(
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    border: Border.all(color: const Color(0xFF00FF00), width: 1),
-                    color: const Color(0xFF001A00),
-                  ),
-                  child: Row(
-                    children: [
-                      const Icon(
-                        Icons.flash_on,
-                        color: Color(0xFF00FF00),
-                        size: 20,
+                SizedBox(
+                  width: double.infinity,
+                  child: Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      border: Border.all(
+                        color: carrier?.isJumpReady == true 
+                          ? const Color(0xFF00FF00) 
+                          : const Color(0xFFFF6600), 
+                        width: 1,
                       ),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: Text(
-                          'JUMP READY',
-                          style: const TextStyle(
-                            color: Color(0xFF00FF00),
-                            fontFamily: 'monospace',
-                            fontSize: 14,
-                            fontWeight: FontWeight.w500,
-                          ),
-                          overflow: TextOverflow.ellipsis,
+                      color: carrier?.isJumpReady == true 
+                        ? const Color(0xFF001A00)
+                        : const Color(0xFF1A0A00),
+                    ),
+                    child: Row(
+                      children: [
+                        Icon(
+                          carrier?.isJumpReady == true ? Icons.flash_on : Icons.schedule,
+                          color: carrier?.isJumpReady == true 
+                            ? const Color(0xFF00FF00) 
+                            : const Color(0xFFFF6600),
+                          size: 20,
                         ),
-                      ),
-                    ],
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            carrier?.isJumpReady == true ? 'JUMP READY' : 'COOLDOWN',
+                            style: TextStyle(
+                              color: carrier?.isJumpReady == true 
+                                ? const Color(0xFF00FF00) 
+                                : const Color(0xFFFF6600),
+                              fontFamily: 'monospace',
+                              fontSize: 14,
+                              fontWeight: FontWeight.w500,
+                            ),
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
                 ),
               ],
@@ -568,7 +785,9 @@ class CarrierOverviewPage extends StatelessWidget {
 
 // Carrier Control Page
 class CarrierControlPage extends StatelessWidget {
-  const CarrierControlPage({super.key});
+  final dynamic carrier;
+  
+  const CarrierControlPage({super.key, required this.carrier});
 
   @override
   Widget build(BuildContext context) {
@@ -788,10 +1007,78 @@ class CarrierControlPage extends StatelessWidget {
 
 // Carrier Services Page
 class CarrierServicesPage extends StatelessWidget {
-  const CarrierServicesPage({super.key});
+  final Carrier carrier;
+  
+  const CarrierServicesPage({super.key, required this.carrier});
+
+  // Define all possible carrier services
+  static const List<Map<String, dynamic>> _allServices = [
+    {
+      'id': 'refuel',
+      'title': 'REFUEL',
+      'icon': Icons.local_gas_station,
+      'description': 'Fuel services',
+      'serverName': 'Refuel', // Name as it appears in server data
+    },
+    {
+      'id': 'rearm',
+      'title': 'REARM',
+      'icon': Icons.rocket_launch,
+      'description': 'Ammunition & ordinance',
+      'serverName': 'Rearm',
+    },
+    {
+      'id': 'repair',
+      'title': 'REPAIR',
+      'icon': Icons.build_circle,
+      'description': 'Hull & module repairs',
+      'serverName': 'Repair',
+    },
+    {
+      'id': 'universal_cartographics',
+      'title': 'UNIVERSAL CARTOGRAPHICS',
+      'icon': Icons.map,
+      'description': 'Exploration data sales',
+      'serverName': 'Universal Cartographics',
+    },
+    {
+      'id': 'shipyard',
+      'title': 'SHIPYARD',
+      'icon': Icons.precision_manufacturing,
+      'description': 'Ship purchase & sales',
+      'serverName': 'Shipyard',
+    },
+    {
+      'id': 'outfitting',
+      'title': 'OUTFITTING',
+      'icon': Icons.settings,
+      'description': 'Module sales & upgrades',
+      'serverName': 'Outfitting',
+    },
+    {
+      'id': 'commodities',
+      'title': 'COMMODITIES MARKET',
+      'icon': Icons.store,
+      'description': 'Trade goods exchange',
+      'serverName': 'Commodities',
+    },
+    {
+      'id': 'redemption',
+      'title': 'REDEMPTION OFFICE',
+      'icon': Icons.assignment_turned_in,
+      'description': 'Bounty & bond processing',
+      'serverName': 'Redemption Office',
+    },
+  ];
 
   @override
   Widget build(BuildContext context) {
+    // Get carrier services from the carrier data
+    final List<CarrierService> carrierServices = carrier.services ?? [];
+    
+    // Count active services
+    int activeServices = carrierServices.where((service) => service.enabled).length;
+    
     return Container(
       color: const Color(0xFF000000),
       padding: const EdgeInsets.all(20),
@@ -838,51 +1125,37 @@ class CarrierServicesPage extends StatelessWidget {
                   crossAxisCount: 2,
                   crossAxisSpacing: 20,
                   mainAxisSpacing: 20,
-                  childAspectRatio: 1.2, // Made slightly taller to fit content better
-                  children: [
-                    _buildServiceCard(
-                      'UNIVERSAL CARTOGRAPHICS',
-                      'assets/images/icons/Universal-Cartographics.svg',
-                      'Exploration data sales',
-                      'OPERATIONAL',
-                      const Color(0xFF00FF00),
-                    ),
-                    _buildServiceCard(
-                      'SHIPYARD',
-                      Icons.build,
-                      'Ship purchase & outfitting',
-                      'OPERATIONAL',
-                      const Color(0xFF00FF00),
-                    ),
-                    _buildServiceCard(
-                      'OUTFITTING',
-                      Icons.settings,
-                      'Module sales & upgrades',
-                      'OPERATIONAL',
-                      const Color(0xFF00FF00),
-                    ),
-                    _buildServiceCard(
-                      'COMMODITIES MARKET',
-                      Icons.store,
-                      'Trade goods exchange',
-                      'OPERATIONAL',
-                      const Color(0xFF00FF00),
-                    ),
-                    _buildServiceCard(
-                      'REFUEL & REPAIR',
-                      Icons.local_gas_station,
-                      'Ship maintenance services',
-                      'OPERATIONAL',
-                      const Color(0xFF00FF00),
-                    ),
-                    _buildServiceCard(
-                      'REDEMPTION OFFICE',
-                      Icons.assignment_turned_in,
-                      'Bounty & bond processing',
-                      'OPERATIONAL',
-                      const Color(0xFF00FF00),
-                    ),
-                  ],
+                  childAspectRatio: 1.2,
+                  children: _allServices.map((serviceConfig) {
+                    // Find matching service in carrier data
+                    final carrierService = carrierServices.cast<CarrierService?>().firstWhere(
+                      (service) => service?.serviceType == serviceConfig['serverName'],
+                      orElse: () => null,
+                    );
+                    
+                    // Determine status
+                    String status;
+                    Color statusColor;
+                    
+                    if (carrierService == null) {
+                      status = 'NOT INSTALLED';
+                      statusColor = const Color(0xFF666666);
+                    } else if (!carrierService.enabled) {
+                      status = 'SUSPENDED';
+                      statusColor = const Color(0xFFFFAA00);
+                    } else {
+                      status = 'OPERATIONAL';
+                      statusColor = const Color(0xFF00FF00);
+                    }
+                    
+                    return _buildServiceCard(
+                      serviceConfig['title'],
+                      serviceConfig['icon'],
+                      serviceConfig['description'],
+                      status,
+                      statusColor,
+                    );
+                  }).toList(),
                 ),
               ),
             ),
@@ -896,7 +1169,7 @@ class CarrierServicesPage extends StatelessWidget {
                 top: BorderSide(color: Color(0xFF333333), width: 1),
               ),
             ),
-            child: const Row(
+            child: Row(
               children: [
                 Text(
                   'ACTIVE SERVICES: ',
@@ -907,7 +1180,7 @@ class CarrierServicesPage extends StatelessWidget {
                   ),
                 ),
                 Text(
-                  '6',
+                  '$activeServices',
                   style: TextStyle(
                     color: Color(0xFF00FF00),
                     fontFamily: 'monospace',
@@ -959,29 +1232,12 @@ class CarrierServicesPage extends StatelessWidget {
             // Header with icon and status
             Row(
               children: [
-                // Handle both IconData and asset path
-                icon is IconData
-                    ? Icon(
-                        icon,
-                        color: const Color(0xFFFF6600),
-                        size: 20,
-                      )
-                    : icon.toString().endsWith('.svg')
-                        ? SvgPicture.asset(
-                            icon,
-                            width: 20,
-                            height: 20,
-                            colorFilter: const ColorFilter.mode(
-                              Color(0xFFFF6600),
-                              BlendMode.srcIn,
-                            ),
-                          )
-                        : Image.asset(
-                            icon,
-                            width: 20,
-                            height: 20,
-                            color: const Color(0xFFFF6600),
-                          ),
+                // Handle IconData only (removed SVG support since it's not being used)
+                Icon(
+                  icon as IconData,
+                  color: const Color(0xFFFF6600),
+                  size: 20,
+                ),
                 const Spacer(),
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
@@ -1036,11 +1292,11 @@ class CarrierServicesPage extends StatelessWidget {
             
             const Spacer(),
             
-            // Action button area
-            const Text(
-              'TAP TO CONFIGURE',
+            // Action button area - different text based on status
+            Text(
+              status == 'NOT INSTALLED' ? 'NOT AVAILABLE' : 'TAP TO CONFIGURE',
               style: TextStyle(
-                color: Color(0xFF666666),
+                color: status == 'NOT INSTALLED' ? const Color(0xFF444444) : const Color(0xFF666666),
                 fontFamily: 'monospace',
                 fontSize: 7,
               ),
@@ -1097,25 +1353,6 @@ class SettingsPage extends StatelessWidget {
           Expanded(
             child: ListView(
               children: [
-                _buildSettingsSection('API CONFIGURATION', [
-                  _buildSettingsItem(
-                    Icons.api,
-                    'Frontier API',
-                    'Configure game data integration',
-                    'Connected',
-                    const Color(0xFF00FF00),
-                  ),
-                  _buildSettingsItem(
-                    Icons.key,
-                    'Authentication',
-                    'API keys and tokens',
-                    'Valid',
-                    const Color(0xFF00FF00),
-                  ),
-                ]),
-                
-                const SizedBox(height: 20),
-                
                 _buildSettingsSection('NOTIFICATIONS', [
                   _buildSettingsItem(
                     Icons.notifications,
