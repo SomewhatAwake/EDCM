@@ -87,6 +87,9 @@ data/
 *.db
 *.sqlite
 
+# Test files with credentials
+test_*_login.json
+
 # Log files
 logs/
 *.log

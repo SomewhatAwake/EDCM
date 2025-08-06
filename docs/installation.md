@@ -1,155 +1,254 @@
-# Installation Guide
+# Installation Guide - Elite Dangerous Carrier Manager
 
-## Prerequisites
+## 🚀 Quick Start (Recommended)
 
-### Server Requirements
-- Node.js 16 or higher
-- NPM or Yarn package manager
-- Elite Dangerous installation (for journal monitoring)
+The easiest way to get started is using the automated setup script:
 
-### Client Requirements
-- React Native development environment
-- Android Studio (for Android development)
-- Java Development Kit (JDK) 8 or higher
-- Android SDK
+```powershell
+# Clone the repository (if not already done)
+git clone <repository-url>
+cd "Carrier Manager"
 
-## Server Setup
+# Run the automated setup
+.\setup.ps1
+```
 
-1. **Navigate to the server directory:**
-   ```bash
+This script will:
+- ✅ Install server dependencies
+- ✅ Configure environment variables
+- ✅ Install Flutter dependencies
+- ✅ Generate required code
+- ✅ Set up Tailscale configuration
+
+## 📋 Prerequisites
+
+### System Requirements
+- **Windows 10/11** (Primary support)
+- **Node.js 16+** - [Download here](https://nodejs.org/)
+- **Flutter 3.8.1+** - [Installation guide](https://docs.flutter.dev/get-started/install)
+- **Elite Dangerous** - For journal file monitoring
+- **Tailscale Account** - [Free at tailscale.com](https://tailscale.com/)
+
+## 🖥️ Server Setup
+
+### Automated Server Setup
+```powershell
+cd server
+npm install
+npm start  # Production mode
+# OR
+npm run dev  # Development mode with auto-restart
+```
+
+### Manual Server Configuration
+1. **Install dependencies:**
+   ```powershell
    cd server
-   ```
-
-2. **Install dependencies:**
-   ```bash
    npm install
    ```
 
-3. **Configure environment variables:**
-   ```bash
-   cp .env.example .env
+2. **Configure environment (optional):**
+   ```powershell
+   # Copy example environment file
+   copy .env.example .env
    ```
    
-   Edit `.env` file with your configuration:
+   Edit `.env` file with your paths:
    ```env
-   NODE_ENV=development
-   PORT=3000
-   CLIENT_ORIGIN=http://localhost:8081
-   JWT_SECRET=your-super-secret-jwt-key-change-this-in-production
-   JWT_EXPIRES_IN=24h
+   # Elite Dangerous Configuration
    ED_JOURNAL_PATH=C:/Users/YourUsername/Saved Games/Frontier Developments/Elite Dangerous
    ED_INSTALL_PATH=C:/Program Files (x86)/Steam/steamapps/common/Elite Dangerous
-   DB_PATH=./data/carrier.db
-   LOG_LEVEL=info
-   ```
 
-4. **Create necessary directories:**
-   ```bash
-   mkdir data
-   mkdir logs
-   ```
-
-5. **Start the server:**
-   ```bash
-   npm start
-   ```
+   # Server Configuration  
+   PORT=3000
+   NODE_ENV=development
    
-   For development with auto-restart:
-   ```bash
-   npm run dev
+   # Optional: Tailscale Override (usually not needed)
+   # TAILSCALE_HOSTNAME=your.tailscale.ip
+   ```
+
+3. **Start the server:**
+   ```powershell
+   npm start
    ```
 
 The server will be available at `http://localhost:3000`
 
-## Client Setup
+## 📱 Flutter Client Setup
 
-1. **Navigate to the client directory:**
-   ```bash
-   cd client
+### Automated Client Setup (Recommended)
+```powershell
+cd edcm
+flutter pub get
+dart run build_runner build  # Generate JSON serialization
+flutter run  # Builds with Tailscale pre-configured
+```
+
+### Manual Client Setup
+
+1. **Navigate to Flutter directory:**
+   ```powershell
+   cd edcm
    ```
 
 2. **Install dependencies:**
-   ```bash
-   npm install
+   ```powershell
+   flutter pub get
    ```
 
-3. **Configure server connection:**
-   Edit `src/config.js` and update the server URL:
-   ```javascript
-   export const API_BASE_URL = 'http://your-server-ip:3000';
+3. **Generate required code:**
+   ```powershell
+   # Generate JSON serialization classes
+   dart run build_runner build
    ```
 
-4. **Install React Native CLI (if not already installed):**
-   ```bash
-   npm install -g react-native-cli
+4. **Build and run:**
+   ```powershell
+   # Default build (Tailscale enabled)
+   flutter run
+   
+   # Or use the enhanced build script
+   ..\build_app.bat
    ```
 
-5. **Set up Android development environment:**
-   - Install Android Studio
-   - Set up Android SDK
-   - Create an Android Virtual Device (AVD) or connect a physical device
+### 🔧 Enhanced Build Script
+Use the interactive build script for different configurations:
 
-6. **Start Metro bundler:**
-   ```bash
-   npx react-native start
-   ```
-
-7. **Run the Android app:**
-   ```bash
-   npx react-native run-android
-   ```
-
-## Elite Dangerous Configuration
-
-### Journal File Location
-
-The server monitors Elite Dangerous journal files to detect carrier events. Ensure the `ED_JOURNAL_PATH` in your `.env` file points to the correct directory:
-
-**Default locations:**
-- **Steam:** `C:/Users/[Username]/Saved Games/Frontier Developments/Elite Dangerous`
-- **Epic:** `C:/Users/[Username]/Saved Games/Frontier Developments/Elite Dangerous`
-- **Standalone:** `C:/Users/[Username]/Saved Games/Frontier Developments/Elite Dangerous`
-
-### Game Integration
-
-The server can interface with Elite Dangerous through:
-
-1. **Journal File Monitoring** (Automatic)
-   - Real-time monitoring of game events
-   - Automatic carrier data updates
-
-2. **Command Execution** (Manual Implementation Required)
-   - Key sequence automation
-   - Game window interaction
-   - Custom keybind integration
-
-## Security Configuration
-
-### JWT Secret
-
-**Important:** Change the JWT secret in production:
-
-```env
-JWT_SECRET=your-unique-super-secret-key-here
+```powershell
+# From project root
+.\build_app.bat
 ```
 
-Generate a secure secret:
-```bash
-node -e "console.log(require('crypto').randomBytes(64).toString('hex'))"
+**Available options:**
+1. **Build with current config** (recommended) - Uses persistent settings
+2. **Build for local development** - Override for local testing  
+3. **Build for Tailscale** - Override for specific Tailscale config
+4. **Build debug version** - Development build with debugging
+5. **Edit configuration file** - Modify default settings
+6. **Show help/documentation** - Usage information
+
+## 🌐 Network Configuration
+
+### 🔒 Tailscale Setup (Recommended for Remote Access)
+
+**The app comes pre-configured for Tailscale with IP `100.103.140.29`.**
+
+1. **Install Tailscale:**
+   - Server: [Download Tailscale](https://tailscale.com/download)
+   - Mobile: Install from Play Store/App Store
+
+2. **Setup on server machine:**
+   ```powershell
+   # Install and authenticate Tailscale
+   tailscale up
+   # Note your Tailscale IP (usually 100.x.x.x)
+   ```
+
+3. **Configure the app (if needed):**
+   - Launch the app
+   - Tap **"NETWORK SETTINGS"** on login screen
+   - Update Tailscale hostname if different from default
+   - Settings are automatically saved
+
+### 🏠 Local Development Options
+- **Android Emulator**: Uses `10.0.2.2:3000` (automatic)
+- **Local WiFi**: Uses `192.168.68.64:3000` (configurable via settings)
+
+## ✅ Verification
+
+### Test Server Connection
+1. **Check server status:**
+   ```powershell
+   # Server should show "Server started on port 3000"
+   curl http://localhost:3000/api/health
+   ```
+
+2. **Test from app:**
+   - Launch the Flutter app
+   - Tap **"TEST CONNECTION"** 
+   - Verify all endpoints show green status
+
+### Test App Features
+1. **Launch the app** - Goes directly to carrier management
+2. **Tap "CONNECT TO CARRIER"** to load your carrier data  
+3. **Check connection status** - should show "SERVER CONNECTION: ONLINE"
+4. **Verify real-time updates** work
+
+## 🎮 Elite Dangerous Integration
+
+### Journal File Monitoring
+The server automatically monitors Elite Dangerous journal files for carrier events.
+
+**Default journal location:**
+```
+C:/Users/[Username]/Saved Games/Frontier Developments/Elite Dangerous
 ```
 
-### HTTPS/WSS (Production)
+**Configuration (if needed):**
+Set `ED_JOURNAL_PATH` in server `.env` file to your Elite Dangerous saved games folder.
 
-For production deployment, configure HTTPS and WSS:
+### Game Integration Features
+- ✅ **Real-time carrier status** from journal files
+- ✅ **Automatic data updates** when events occur
+- ✅ **Carrier location tracking** 
+- ✅ **Jump status monitoring**
+- ✅ **Service status detection**
 
-1. Obtain SSL certificates
-2. Update server configuration
-3. Update client configuration
+## 🔒 Security & Production
 
 ### Firewall Configuration
+**Required ports:**
+- **Server**: Port 3000 (default)
+- **Tailscale**: No additional ports needed (mesh network)
 
-Ensure the following ports are accessible:
-- Server: Port 3000 (or your configured port)
+**For local network access:**
+- Ensure Windows Firewall allows Node.js connections
+- Router port forwarding not recommended (use Tailscale instead)
+
+## 🚨 Troubleshooting
+
+### Common Issues
+
+#### "Server Connection: OFFLINE"
+1. **Check server is running**: Look for "Server started on port 3000"
+2. **Test API endpoint**: `curl http://localhost:3000/api/health`
+3. **Check firewall**: Ensure port 3000 is accessible
+4. **Network settings**: Use connection test screen to verify endpoints
+
+#### "Failed to connect to Tailscale"
+1. **Verify Tailscale status**: `tailscale status` on server
+2. **Check IP address**: Update app settings with correct Tailscale IP
+3. **Authentication**: Ensure both devices are on same Tailscale network
+4. **Refresh config**: Use refresh button in connection test screen
+
+#### Flutter Build Issues
+1. **Dependencies**: Run `flutter pub get`
+2. **Code generation**: Run `dart run build_runner build`
+3. **Clean build**: `flutter clean && flutter pub get`
+4. **Android issues**: Check Android SDK setup
+
+### Debug Mode
+Enable debug logging:
+1. **Server**: Set `LOG_LEVEL=debug` in `.env`
+2. **Client**: Use debug build via build script
+3. **Network**: Check connection test screen for detailed status
+
+### Getting Help
+1. **Check logs**: Server logs in `server/logs/` directory
+2. **Connection test**: Use built-in diagnostics
+3. **Settings**: Verify configuration in app settings screen
+
+## 📋 Next Steps
+
+After successful installation:
+
+1. **[Read Development Guide](development.md)** - For development setup
+2. **[Check API Documentation](api.md)** - For API integration  
+3. **[Elite Dangerous Integration](elite-dangerous-integration.md)** - Game-specific features
+
+---
+
+**🎉 Congratulations!** Your Elite Dangerous Carrier Manager is now ready for secure remote carrier management!
 - Client: Standard React Native development ports
 
 ## Troubleshooting

@@ -29,24 +29,16 @@ class Database {
 
   async createTables() {
     const tables = [
-      `CREATE TABLE IF NOT EXISTS users (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        username TEXT UNIQUE NOT NULL,
-        password_hash TEXT NOT NULL,
-        created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-      )`,
-      
       `CREATE TABLE IF NOT EXISTS carriers (
         id TEXT PRIMARY KEY,
+        internal_id TEXT,
         name TEXT NOT NULL,
-        owner_id INTEGER,
         current_system TEXT,
         docking_access TEXT DEFAULT 'all',
         notorious_access BOOLEAN DEFAULT 0,
         fuel_level INTEGER DEFAULT 0,
         jump_cooldown INTEGER DEFAULT 0,
-        last_updated DATETIME DEFAULT CURRENT_TIMESTAMP,
-        FOREIGN KEY (owner_id) REFERENCES users (id)
+        last_updated DATETIME DEFAULT CURRENT_TIMESTAMP
       )`,
       
       `CREATE TABLE IF NOT EXISTS carrier_services (
@@ -78,6 +70,24 @@ class Database {
 
     for (const table of tables) {
       await this.run(table);
+    }
+
+    // Run migrations
+    await this.runMigrations();
+  }
+
+  async runMigrations() {
+    try {
+      // Check if internal_id column exists, if not add it
+      const tableInfo = await this.all("PRAGMA table_info(carriers)");
+      const hasInternalId = tableInfo.some(col => col.name === 'internal_id');
+      
+      if (!hasInternalId) {
+        await this.run("ALTER TABLE carriers ADD COLUMN internal_id TEXT");
+        console.log('Migration: Added internal_id column to carriers table');
+      }
+    } catch (error) {
+      console.error('Migration error:', error);
     }
   }
 

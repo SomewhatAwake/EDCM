@@ -1,252 +1,458 @@
-# Development Setup Guide
+# Development Guide - Elite Dangerous Carrier Manager
 
-## Overview
+## 🚀 Overview
 
-This guide will help you set up the development environment for the Elite Dangerous Fleet Carrier Companion App.
+This guide covers setting up the development environment for the Elite Dangerous Carrier Manager, including the Node.js server and Flutter client with modern tooling and best practices.
 
-## Prerequisites
+## 📋 Prerequisites
 
 ### Required Software
 
-1. **Node.js** (v16 or higher)
+1. **Node.js** (v16 or higher) ⚡
    - Download from [nodejs.org](https://nodejs.org/)
-   - Verify installation: `node --version`
+   - Verify: `node --version`
 
-2. **Git**
+2. **Flutter** (v3.8.1 or higher) 📱
+   - Follow [Flutter installation guide](https://docs.flutter.dev/get-started/install)
+   - Verify: `flutter doctor`
+
+3. **Git** 🔧
    - Download from [git-scm.com](https://git-scm.com/)
-   - Verify installation: `git --version`
+   - Verify: `git --version`
 
-3. **Visual Studio Code** (Recommended)
+4. **Visual Studio Code** (Recommended) 💻
    - Download from [code.visualstudio.com](https://code.visualstudio.com/)
+   - Install Flutter/Dart extensions
 
-### Android Development (Client)
+### Android Development Setup
 
-1. **Java Development Kit (JDK 8 or 11)**
-   - Download from [Oracle](https://www.oracle.com/java/technologies/javase-downloads.html) or [OpenJDK](https://openjdk.java.net/)
-   - Set JAVA_HOME environment variable
-
-2. **Android Studio**
+1. **Android Studio** 📱
    - Download from [developer.android.com](https://developer.android.com/studio)
-   - Install Android SDK and required tools
-   - Set ANDROID_HOME environment variable
+   - Install Android SDK (API level 30+)
+   - Set up AVD (Android Virtual Device)
 
-3. **React Native CLI**
-   ```bash
-   npm install -g react-native-cli
+2. **Environment Variables**
+   ```powershell
+   # Add to your system PATH
+   ANDROID_HOME=C:\Users\[Username]\AppData\Local\Android\Sdk
+   JAVA_HOME=C:\Program Files\Android\Android Studio\jre
    ```
 
-## Project Setup
+## 🛠️ Project Setup
 
-### 1. Clone the Repository
-
-```bash
+### 1. Repository Setup
+```powershell
+# Clone the repository
 git clone <repository-url>
-cd elite-dangerous-carrier-companion
+cd "Carrier Manager"
+
+# Quick setup with automated script
+.\setup.ps1
 ```
 
-### 2. Install Dependencies
+### 2. Manual Development Setup
 
-#### Server Dependencies
-```bash
+#### Server Development
+```powershell
 cd server
+
+# Install dependencies
 npm install
+
+# Install development tools (optional)
+npm install -g nodemon
+
+# Copy environment template
+copy .env.example .env
+
+# Start development server
+npm run dev  # Auto-restart on changes
 ```
 
-#### Client Dependencies
-```bash
-cd ../client
-npm install
+#### Flutter Development  
+```powershell
+cd edcm
+
+# Install dependencies
+flutter pub get
+
+# Generate JSON serialization code
+dart run build_runner build
+
+# Run code generation in watch mode (development)
+dart run build_runner watch
+
+# Run the app
+flutter run  # Hot reload enabled
 ```
 
-### 3. Environment Configuration
+## ⚙️ Development Configuration
 
-#### Server Environment
-```bash
-cd ../server
-cp .env.example .env
-```
-
-Edit `.env` file:
+### Server Environment (.env)
 ```env
+# Development Configuration
 NODE_ENV=development
 PORT=3000
-CLIENT_ORIGIN=http://localhost:8081
-JWT_SECRET=your-development-secret-key
-JWT_EXPIRES_IN=24h
+LOG_LEVEL=debug
+
+# Elite Dangerous Paths (adjust for your system)
 ED_JOURNAL_PATH=C:/Users/YourUsername/Saved Games/Frontier Developments/Elite Dangerous
 ED_INSTALL_PATH=C:/Program Files (x86)/Steam/steamapps/common/Elite Dangerous
+
+# JWT Configuration
+JWT_SECRET=development-secret-change-in-production
+JWT_EXPIRES_IN=24h
+
+# Database
 DB_PATH=./data/carrier.db
-LOG_LEVEL=debug
+
+# Optional: Override network settings (advanced)
+# USE_TAILSCALE=false
+# TAILSCALE_HOSTNAME=100.x.x.x
 ```
 
-#### Client Configuration
-Edit `client/src/config.js`:
-```javascript
-export const API_BASE_URL = 'http://localhost:3000'; // Server URL
+### Flutter Configuration (app_config.dart)
+```dart
+class AppConfig {
+  // Network Configuration - Edit for development
+  static const bool useTailscale = false; // Set to false for local dev
+  static const String tailscaleHostname = '100.103.140.29';
+  static const String tailscalePort = '3000';
+  
+  // Local Development Endpoints
+  static const String localAndroidEmulator = 'http://10.0.2.2:3000';
+  static const String localNetworkIP = 'http://192.168.1.100:3000'; // Your IP
+  
+  // Debug logging
+  static const bool enableDebugLogging = true;
+}
 ```
 
-### 4. Database Setup
+## 🏗️ Project Architecture
 
-The server will automatically create the SQLite database on first run. Ensure the data directory exists:
-
-```bash
-cd server
-mkdir data
-mkdir logs
+### Server Structure
+```
+server/
+├── src/
+│   ├── index.js           # Main server entry point
+│   ├── database/          # SQLite database management
+│   ├── middleware/        # Express middleware (auth, cors, etc.)
+│   ├── routes/           # API routes (auth, carrier)
+│   └── services/         # Business logic services
+├── data/                 # SQLite database files
+├── logs/                 # Application logs
+└── package.json          # Dependencies and scripts
 ```
 
-## Development Workflow
-
-### VS Code Setup
-
-Install recommended extensions:
-1. **ES7+ React/Redux/React-Native snippets**
-2. **React Native Tools**
-3. **Prettier - Code formatter**
-4. **ESLint**
-5. **GitLens**
-
-### Running the Application
-
-#### Method 1: Using VS Code Tasks
-
-1. Open the project in VS Code
-2. Press `Ctrl+Shift+P` (or `Cmd+Shift+P` on macOS)
-3. Type "Tasks: Run Task"
-4. Select "Setup Environment" to install all dependencies
-
-Then run individual components:
-- "Start Server (Development)" - Runs server with auto-restart
-- "Start React Native Metro" - Starts React Native bundler
-- "Run Android App" - Builds and runs Android app
-
-#### Method 2: Manual Commands
-
-**Terminal 1 - Server:**
-```bash
-cd server
-npm run dev
+### Flutter Client Structure  
+```
+edcm/
+├── lib/
+│   ├── main.dart                # App entry point
+│   ├── config/                  # Configuration management
+│   │   ├── app_config.dart      # Default settings
+│   │   └── network_config.dart  # Network configuration
+│   ├── models/                  # Data models with JSON serialization
+│   ├── providers/               # State management (Provider pattern)
+│   ├── screens/                 # UI screens
+│   │   ├── login_screen.dart    # Authentication
+│   │   ├── dashboard_screen.dart # Main carrier view
+│   │   ├── connection_test_screen.dart # Network diagnostics
+│   │   └── settings_screen.dart # In-app configuration
+│   └── services/               # API and WebSocket services
+├── android/                    # Android-specific files
+└── pubspec.yaml               # Flutter dependencies
 ```
 
-**Terminal 2 - React Native Metro:**
-```bash
-cd client
-npx react-native start
-```
+## 🔧 Development Workflow
 
-**Terminal 3 - Android App:**
-```bash
-cd client
-npx react-native run-android
-```
+### Daily Development Setup
 
-## Development Best Practices
-
-### Code Style
-
-#### JavaScript/React Native
-- Use ESLint and Prettier for consistent formatting
-- Follow React Hooks patterns
-- Use functional components over class components
-- Implement proper error boundaries
-
-#### Node.js
-- Use async/await over callbacks
-- Implement proper error handling
-- Use middleware for common functionality
-- Follow RESTful API conventions
-
-### Git Workflow
-
-1. **Branching Strategy:**
-   ```bash
-   git checkout -b feature/your-feature-name
-   git checkout -b bugfix/issue-description
+1. **Start the server:**
+   ```powershell
+   cd server
+   npm run dev  # Auto-restart on file changes
    ```
 
-2. **Commit Messages:**
-   ```
-   feat: add carrier jump functionality
-   fix: resolve websocket connection issue
-   docs: update API documentation
-   style: format code with prettier
+2. **Start Flutter with hot reload:**
+   ```powershell
+   cd edcm
+   flutter run  # Hot reload enabled for instant UI updates
    ```
 
-3. **Pull Requests:**
-   - Create descriptive PR titles
-   - Include testing instructions
-   - Link related issues
+3. **Code generation (when models change):**
+   ```powershell
+   # In separate terminal
+   cd edcm
+   dart run build_runner watch  # Auto-regenerate on model changes
+   ```
 
-### Testing
+### Testing & Debugging
 
 #### Server Testing
-```bash
+```powershell
+# Run server tests
 cd server
 npm test
+
+# Manual API testing
+curl http://10.0.2.2:3000/api/health  # Android emulator
+# or curl http://192.168.1.x:3000/api/health  # Your local IP
+# or curl http://100.103.140.29:3000/api/health  # Tailscale IP
+
+# Check server logs
+type logs\combined.log
 ```
 
-#### Client Testing
-```bash
-cd client
-npm test
+#### Flutter Testing
+```powershell
+# Run Flutter tests
+cd edcm
+flutter test
+
+# Widget tests
+flutter test test/widget_test.dart
+
+# Integration tests
+flutter drive --target=test_driver/app.dart
 ```
 
-### Debugging
+#### Connection Testing
+1. **Use built-in connection test:**
+   - Launch app
+   - Tap "TEST CONNECTION"
+   - Verify all endpoints
 
-#### Server Debugging
-1. Use VS Code debugger with Node.js configuration
-2. Add breakpoints in source code
-3. Use `console.log` for quick debugging
-4. Check log files in `server/logs/`
+2. **Network diagnostics:**
+   - Check "NETWORK SETTINGS" 
+   - Test different configurations
+   - Use refresh button to reload settings
 
-#### Client Debugging
-1. Use React Native Debugger
-2. Enable Chrome DevTools
-3. Use Flipper for advanced debugging
-4. Check Metro bundler logs
+## 🛠️ Development Tools
 
-#### Elite Dangerous Integration Debugging
-1. Monitor journal files manually
-2. Use test journal entries
-3. Verify file permissions
-4. Check Elite Dangerous game state
+### Recommended VS Code Extensions
 
-## Environment Variables
+**Flutter/Dart:**
+- Flutter (Dart-Code.flutter)
+- Dart (Dart-Code.dart-code)
 
-### Development vs Production
+**Node.js/JavaScript:**
+- ES7+ React/Redux/React-Native snippets
+- REST Client (for API testing)
 
-#### Development
-```env
-NODE_ENV=development
-LOG_LEVEL=debug
-JWT_SECRET=development-secret-key
+**General:**
+- GitLens
+- Bracket Pair Colorizer
+- Auto Rename Tag
+
+### Build Scripts for Development
+
+#### Enhanced Build Script
+```powershell
+# Interactive build with config options
+.\build_app.bat
+
+# Direct development build
+cd edcm
+flutter run --debug
 ```
 
-#### Production
-```env
-NODE_ENV=production
-LOG_LEVEL=info
-JWT_SECRET=secure-production-key
+#### Watch Mode for Code Generation
+```powershell
+# Auto-regenerate JSON serialization on model changes
+cd edcm
+dart run build_runner watch --delete-conflicting-outputs
 ```
 
-### Security Considerations
+## 🔧 Configuration Management
 
-1. **Never commit sensitive data**
-2. **Use different secrets for dev/prod**
-3. **Implement proper input validation**
-4. **Use HTTPS in production**
+### Persistent Settings System
 
-## Common Development Issues
+The app uses a three-tier configuration system:
+
+1. **SharedPreferences** (highest priority) - User settings
+2. **Environment Variables** - Development overrides  
+3. **app_config.dart** - Default fallback values
+
+#### Modifying Default Configuration
+Edit `edcm/lib/config/app_config.dart`:
+
+```dart
+class AppConfig {
+  // For local development, set useTailscale to false
+  static const bool useTailscale = false;
+  static const String localNetworkIP = 'http://YOUR_IP:3000';
+  
+  // Enable debug logging for development
+  static const bool enableDebugLogging = true;
+}
+```
+
+#### Runtime Configuration Changes
+Use the in-app settings screen:
+1. Launch app → "NETWORK SETTINGS"
+2. Modify settings as needed
+3. Settings persist automatically
+
+### Environment Variable Overrides
+For advanced development scenarios:
+
+```powershell
+# Override default Tailscale setting
+$env:USE_TAILSCALE = "false"
+
+# Override hostname for testing
+$env:TAILSCALE_HOSTNAME = "192.168.1.100"
+
+# Run with overrides
+flutter run
+```
+
+## 🐛 Common Development Issues & Solutions
 
 ### Server Issues
 
 1. **Port Already in Use**
-   ```bash
+   ```powershell
    # Find process using port 3000
    netstat -ano | findstr :3000
-   # Kill process
+   # Kill process (replace PID)
    taskkill /PID <process-id> /F
    ```
+
+2. **Journal File Access Denied**
+   ```powershell
+   # Ensure Elite Dangerous is not running
+   # Check file permissions on journal directory
+   # Verify ED_JOURNAL_PATH in .env
+   ```
+
+3. **Database Connection Issues**
+   ```powershell
+   # Check if data directory exists
+   mkdir server\data
+   # Delete and recreate database
+   del server\data\carrier.db
+   npm run dev  # Will recreate database
+   ```
+
+### Flutter Issues
+
+1. **Hot Reload Not Working**
+   ```powershell
+   # Restart Flutter app
+   flutter run
+   # Or press 'r' in terminal for hot reload
+   # Press 'R' for hot restart
+   ```
+
+2. **Build Runner Issues**
+   ```powershell
+   # Clean and regenerate
+   flutter packages pub run build_runner clean
+   dart run build_runner build --delete-conflicting-outputs
+   ```
+
+3. **Android Build Failures**
+   ```powershell
+   # Clean Flutter build
+   flutter clean
+   flutter pub get
+   
+   # Clean Android build  
+   cd android
+   .\gradlew clean
+   ```
+
+4. **Network Configuration Issues**
+   - Use connection test screen to diagnose
+   - Check firewall settings
+   - Verify IP addresses in app_config.dart
+   - Try different network endpoints
+
+## 📝 Code Style & Best Practices
+
+### Flutter/Dart Guidelines
+- Use `const` constructors where possible
+- Follow Dart naming conventions (camelCase for variables)
+- Implement proper error handling with try-catch
+- Use `async`/`await` for asynchronous operations
+- Leverage Provider for state management
+
+### Node.js Guidelines  
+- Use ES6+ features (arrow functions, destructuring)
+- Implement proper middleware patterns
+- Use Winston for structured logging
+- Handle errors with proper HTTP status codes
+- Follow RESTful API conventions
+
+### Git Workflow
+```powershell
+# Feature development
+git checkout -b feature/carrier-management
+git add .
+git commit -m "feat: add carrier service management"
+git push origin feature/carrier-management
+```
+
+## 🔍 Debugging & Monitoring
+
+### Server Debugging
+```powershell
+# Enable debug logging
+# In .env: LOG_LEVEL=debug
+
+# View real-time logs
+Get-Content server\logs\combined.log -Wait
+
+# API testing
+curl http://10.0.2.2:3000/api/health  # Android emulator
+# or curl http://192.168.1.x:3000/api/health  # Your local IP
+# or curl http://100.103.140.29:3000/api/health  # Tailscale IP
+```
+
+### Flutter Debugging
+```powershell
+# Run with debugging enabled
+flutter run --debug
+
+# Hot reload: press 'r'
+# Hot restart: press 'R'  
+# Open dev tools: press 'w' (web) or use VS Code debugger
+```
+
+### Network Debugging
+1. **Connection Test Screen** - Built-in diagnostics
+2. **Settings Screen** - Verify current configuration  
+3. **Server Logs** - Check incoming requests
+4. **Chrome DevTools** - Inspect network requests
+
+## 📚 Documentation & Resources
+
+### Project Documentation
+- **[Installation Guide](installation.md)** - Setup instructions
+- **[API Reference](api.md)** - REST API documentation
+- **[Elite Dangerous Integration](elite-dangerous-integration.md)** - Game integration
+
+### External Resources
+- **[Flutter Documentation](https://docs.flutter.dev/)**
+- **[Node.js Documentation](https://nodejs.org/docs/)**
+- **[Elite Dangerous Journal Documentation](https://elite-journal.readthedocs.io/)**
+- **[Tailscale Documentation](https://tailscale.com/kb/)**
+
+## 🎯 Next Steps
+
+After completing development setup:
+
+1. **Explore the codebase** - Understand the architecture
+2. **Make a small change** - Test the development workflow
+3. **Run all tests** - Ensure everything works
+4. **Set up Tailscale** - Test remote access functionality
+5. **Review API documentation** - Understand available endpoints
+
+---
+
+**Happy coding!** 🚀 Your Elite Dangerous Carrier Manager development environment is ready!
 
 2. **Database Connection Issues**
    - Check data directory permissions

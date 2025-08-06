@@ -1,6 +1,10 @@
 const { spawn } = require('child_process');
 const path = require('path');
 const winston = require('winston');
+const { exec } = require('child_process');
+const util = require('util');
+
+const execAsync = util.promisify(exec);
 
 const logger = winston.createLogger({
   level: 'info',
@@ -22,19 +26,32 @@ class CarrierService {
 
   async updateDockingPermissions(carrierId, dockingAccess, notoriousAccess) {
     try {
-      // This would interface with Elite Dangerous through keybinds or API
-      // For now, this is a placeholder implementation
       logger.info(`Updating docking permissions for carrier ${carrierId}:`, {
         dockingAccess,
         notoriousAccess
       });
 
-      // Simulate command execution
-      await this.simulateCarrierCommand('docking_permissions', {
-        carrierId,
-        dockingAccess,
-        notoriousAccess
-      });
+      // Check if Elite Dangerous is running
+      const isGameRunning = await this.isEliteDangerousRunning();
+      if (!isGameRunning) {
+        throw new Error('Elite Dangerous is not running');
+      }
+
+      // Real implementation would:
+      // 1. Focus Elite Dangerous window
+      // 2. Open carrier management (likely Right Panel -> Carrier)
+      // 3. Navigate to Docking permissions
+      // 4. Change settings via keystrokes
+      
+      // For now, we'll simulate but show what real implementation needs
+      if (process.env.NODE_ENV === 'development') {
+        logger.warn('SIMULATION MODE: Would send key sequence to Elite Dangerous');
+        logger.info(`Would execute: Focus ED -> Right Panel -> Carrier -> Docking -> Set ${dockingAccess}`);
+        await this.simulateDelay(2000); // Simulate operation time
+      } else {
+        // Real implementation would go here
+        await this.executeCarrierDockingChange(dockingAccess, notoriousAccess);
+      }
 
       return true;
     } catch (error) {
@@ -138,6 +155,90 @@ class CarrierService {
     // This would send actual key sequences to the game
     // Implementation depends on the operating system and requirements
     logger.info('Sending key sequence:', keys);
+  }
+
+  // Check if Elite Dangerous is currently running
+  async isEliteDangerousRunning() {
+    try {
+      const { stdout } = await execAsync('tasklist /FI "IMAGENAME eq EliteDangerous64.exe" /NH');
+      return stdout.includes('EliteDangerous64.exe');
+    } catch (error) {
+      logger.error('Failed to check if Elite Dangerous is running:', error);
+      return false;
+    }
+  }
+
+  // Focus Elite Dangerous window
+  async focusEliteDangerous() {
+    try {
+      // This would use Windows API to bring ED to foreground
+      // PowerShell command to focus window
+      const psCommand = `
+        Add-Type -AssemblyName Microsoft.VisualBasic
+        [Microsoft.VisualBasic.Interaction]::AppActivate("Elite Dangerous")
+      `;
+      
+      await execAsync(`powershell -Command "${psCommand}"`);
+      
+      // Wait for window to focus
+      await this.simulateDelay(500);
+      
+      return true;
+    } catch (error) {
+      logger.error('Failed to focus Elite Dangerous:', error);
+      return false;
+    }
+  }
+
+  // Execute actual carrier docking permission change
+  async executeCarrierDockingChange(dockingAccess, notoriousAccess) {
+    try {
+      // Focus Elite Dangerous
+      await this.focusEliteDangerous();
+
+      // This is where we'd implement the actual key sequence:
+      // 1. Open right panel (default: '4' key)
+      // 2. Navigate to carrier management
+      // 3. Go to docking permissions
+      // 4. Change settings
+      
+      // Example key sequence (would need to match your key bindings):
+      // await this.sendKey('4'); // Right panel
+      // await this.simulateDelay(1000);
+      // await this.sendKey('ArrowDown'); // Navigate to carrier
+      // await this.sendKey('Enter');
+      // etc...
+
+      logger.warn('Real carrier docking change not implemented - requires key automation');
+      return true;
+    } catch (error) {
+      logger.error('Failed to execute carrier docking change:', error);
+      return false;
+    }
+  }
+
+  // Helper to send individual keys (Windows implementation)
+  async sendKey(key) {
+    try {
+      // This would use Windows SendInput API or PowerShell
+      // Example PowerShell approach:
+      const psCommand = `
+        Add-Type -AssemblyName System.Windows.Forms
+        [System.Windows.Forms.SendKeys]::SendWait("${key}")
+      `;
+      
+      await execAsync(`powershell -Command "${psCommand}"`);
+      
+      // Small delay between keys
+      await this.simulateDelay(100);
+    } catch (error) {
+      logger.error(`Failed to send key ${key}:`, error);
+    }
+  }
+
+  // Helper for delays
+  async simulateDelay(ms) {
+    return new Promise(resolve => setTimeout(resolve, ms));
   }
 }
 

@@ -1,24 +1,26 @@
 const express = require('express');
-const Joi = require('joi');
 const database = require('../database/db');
-const auth = require('../middleware/auth');
 const carrierService = require('../services/carrierService');
 
 const router = express.Router();
 
-// Apply authentication middleware to all routes
-router.use(auth);
-
-// Get all carriers for authenticated user
+// Get all carriers
 router.get('/', async (req, res) => {
   try {
     const carriers = await database.all(
       `SELECT c.*, cf.balance, cf.upkeep_cost, cf.next_upkeep 
        FROM carriers c 
-       LEFT JOIN carrier_finance cf ON c.id = cf.carrier_id 
-       WHERE c.owner_id = ?`,
-      [req.user.userId]
+       LEFT JOIN carrier_finance cf ON c.id = cf.carrier_id`
     );
+
+    // Get services for each carrier
+    for (const carrier of carriers) {
+      const services = await database.all(
+        'SELECT service_type, enabled FROM carrier_services WHERE carrier_id = ?',
+        [carrier.id]
+      );
+      carrier.services = services;
+    }
 
     res.json(carriers);
   } catch (error) {
@@ -28,16 +30,16 @@ router.get('/', async (req, res) => {
 });
 
 // Get specific carrier details
-router.get('/:carrierId', async (req, res) => {
+router.get('/:callsign', async (req, res) => {
   try {
-    const { carrierId } = req.params;
+    const { callsign } = req.params;
 
     const carrier = await database.get(
       `SELECT c.*, cf.balance, cf.upkeep_cost, cf.next_upkeep 
        FROM carriers c 
        LEFT JOIN carrier_finance cf ON c.id = cf.carrier_id 
-       WHERE c.id = ? AND c.owner_id = ?`,
-      [carrierId, req.user.userId]
+       WHERE c.id = ?`,
+      [callsign]
     );
 
     if (!carrier) {
@@ -47,7 +49,7 @@ router.get('/:carrierId', async (req, res) => {
     // Get carrier services
     const services = await database.all(
       'SELECT service_type, enabled FROM carrier_services WHERE carrier_id = ?',
-      [carrierId]
+      [callsign]
     );
 
     res.json({
@@ -61,15 +63,15 @@ router.get('/:carrierId', async (req, res) => {
 });
 
 // Update carrier docking permissions
-router.put('/:carrierId/docking', async (req, res) => {
+router.put('/:callsign/docking', async (req, res) => {
   try {
-    const { carrierId } = req.params;
+    const { callsign } = req.params;
     const { dockingAccess, notoriousAccess } = req.body;
 
-    // Validate carrier ownership
+    // Check if carrier exists
     const carrier = await database.get(
-      'SELECT id FROM carriers WHERE id = ? AND owner_id = ?',
-      [carrierId, req.user.userId]
+      'SELECT id FROM carriers WHERE id = ?',
+      [callsign]
     );
 
     if (!carrier) {
@@ -82,12 +84,8 @@ router.put('/:carrierId/docking', async (req, res) => {
       return res.status(400).json({ error: 'Invalid docking access setting' });
     }
 
-    // Execute the command (this would interface with Elite Dangerous)
-    const success = await carrierService.updateDockingPermissions(
-      carrierId, 
-      dockingAccess, 
-      notoriousAccess
-    );
+    // Execute the docking permission change
+    const success = await carrierService.updateDockingPermissions(callsign, dockingAccess, notoriousAccess);
 
     if (!success) {
       return res.status(500).json({ error: 'Failed to update docking permissions' });
@@ -96,7 +94,7 @@ router.put('/:carrierId/docking', async (req, res) => {
     // Update database
     await database.run(
       'UPDATE carriers SET docking_access = ?, notorious_access = ?, last_updated = CURRENT_TIMESTAMP WHERE id = ?',
-      [dockingAccess, notoriousAccess ? 1 : 0, carrierId]
+      [dockingAccess, notoriousAccess ? 1 : 0, callsign]
     );
 
     res.json({ 
@@ -112,9 +110,9 @@ router.put('/:carrierId/docking', async (req, res) => {
 });
 
 // Jump carrier to system
-router.post('/:carrierId/jump', async (req, res) => {
+router.post('/:callsign/jump', async (req, res) => {
   try {
-    const { carrierId } = req.params;
+    const { callsign } = req.params;
     const { targetSystem } = req.body;
 
     if (!targetSystem) {
@@ -123,8 +121,8 @@ router.post('/:carrierId/jump', async (req, res) => {
 
     // Validate carrier ownership
     const carrier = await database.get(
-      'SELECT id, current_system, fuel_level FROM carriers WHERE id = ? AND owner_id = ?',
-      [carrierId, req.user.userId]
+      'SELECT id, current_system, fuel_level FROM carriers WHERE id = ?',
+      [callsign]
     );
 
     if (!carrier) {
@@ -137,7 +135,7 @@ router.post('/:carrierId/jump', async (req, res) => {
     }
 
     // Execute the jump command
-    const success = await carrierService.jumpToSystem(carrierId, targetSystem);
+    const success = await carrierService.jumpToSystem(callsign, targetSystem);
 
     if (!success) {
       return res.status(500).json({ error: 'Failed to initiate jump' });
@@ -156,15 +154,15 @@ router.post('/:carrierId/jump', async (req, res) => {
 });
 
 // Update carrier services
-router.put('/:carrierId/services', async (req, res) => {
+router.put('/:callsign/services', async (req, res) => {
   try {
-    const { carrierId } = req.params;
+    const { callsign } = req.params;
     const { services } = req.body;
 
-    // Validate carrier ownership
+    // Check if carrier exists
     const carrier = await database.get(
-      'SELECT id FROM carriers WHERE id = ? AND owner_id = ?',
-      [carrierId, req.user.userId]
+      'SELECT id FROM carriers WHERE id = ?',
+      [callsign]
     );
 
     if (!carrier) {
@@ -174,7 +172,7 @@ router.put('/:carrierId/services', async (req, res) => {
     // Update services
     for (const service of services) {
       const success = await carrierService.updateService(
-        carrierId, 
+        callsign, 
         service.type, 
         service.enabled
       );
@@ -184,7 +182,7 @@ router.put('/:carrierId/services', async (req, res) => {
         await database.run(
           `INSERT OR REPLACE INTO carrier_services (carrier_id, service_type, enabled) 
            VALUES (?, ?, ?)`,
-          [carrierId, service.type, service.enabled ? 1 : 0]
+          [callsign, service.type, service.enabled ? 1 : 0]
         );
       }
     }
@@ -198,14 +196,14 @@ router.put('/:carrierId/services', async (req, res) => {
 });
 
 // Get carrier market data
-router.get('/:carrierId/market', async (req, res) => {
+router.get('/:callsign/market', async (req, res) => {
   try {
-    const { carrierId } = req.params;
+    const { callsign } = req.params;
 
-    // Validate carrier ownership
+    // Check if carrier exists
     const carrier = await database.get(
-      'SELECT id FROM carriers WHERE id = ? AND owner_id = ?',
-      [carrierId, req.user.userId]
+      'SELECT id FROM carriers WHERE id = ?',
+      [callsign]
     );
 
     if (!carrier) {
@@ -213,7 +211,7 @@ router.get('/:carrierId/market', async (req, res) => {
     }
 
     // Get market data (this would be populated by journal monitoring)
-    const marketData = await carrierService.getMarketData(carrierId);
+    const marketData = await carrierService.getMarketData(callsign);
 
     res.json(marketData);
 
@@ -224,19 +222,19 @@ router.get('/:carrierId/market', async (req, res) => {
 });
 
 // Update carrier name
-router.put('/:carrierId/name', async (req, res) => {
+router.put('/:callsign/name', async (req, res) => {
   try {
-    const { carrierId } = req.params;
+    const { callsign } = req.params;
     const { name } = req.body;
 
     if (!name || name.trim().length === 0) {
       return res.status(400).json({ error: 'Name is required' });
     }
 
-    // Validate carrier ownership
+    // Check if carrier exists
     const carrier = await database.get(
-      'SELECT id FROM carriers WHERE id = ? AND owner_id = ?',
-      [carrierId, req.user.userId]
+      'SELECT id FROM carriers WHERE id = ?',
+      [callsign]
     );
 
     if (!carrier) {
@@ -244,7 +242,7 @@ router.put('/:carrierId/name', async (req, res) => {
     }
 
     // Execute the name change command
-    const success = await carrierService.updateCarrierName(carrierId, name.trim());
+    const success = await carrierService.updateCarrierName(callsign, name.trim());
 
     if (!success) {
       return res.status(500).json({ error: 'Failed to update carrier name' });
@@ -253,7 +251,7 @@ router.put('/:carrierId/name', async (req, res) => {
     // Update database
     await database.run(
       'UPDATE carriers SET name = ?, last_updated = CURRENT_TIMESTAMP WHERE id = ?',
-      [name.trim(), carrierId]
+      [name.trim(), callsign]
     );
 
     res.json({ 

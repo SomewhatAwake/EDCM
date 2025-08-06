@@ -7,11 +7,9 @@ const rateLimit = require('express-rate-limit');
 const winston = require('winston');
 require('dotenv').config();
 
-const authRoutes = require('./routes/auth');
 const carrierRoutes = require('./routes/carrier');
 const journalMonitor = require('./services/journalMonitor');
 const database = require('./database/db');
-const socketAuth = require('./middleware/socketAuth');
 
 // Initialize logger
 const logger = winston.createLogger({
@@ -69,8 +67,7 @@ database.init()
   });
 
 // Routes
-app.use('/api/auth', authRoutes);
-app.use('/api/carrier', carrierRoutes);
+app.use('/api/carriers', carrierRoutes);
 
 // Health check endpoint
 app.get('/health', (req, res) => {
@@ -82,8 +79,6 @@ app.get('/health', (req, res) => {
 });
 
 // Socket.IO connection handling
-io.use(socketAuth);
-
 io.on('connection', (socket) => {
   logger.info(`Client connected: ${socket.id}`);
   
@@ -115,7 +110,7 @@ app.use((err, req, res, next) => {
 });
 
 // Start server
-server.listen(PORT, () => {
+server.listen(PORT, '0.0.0.0', () => {
   logger.info(`Elite Dangerous Carrier Server running on port ${PORT}`);
   logger.info(`Environment: ${process.env.NODE_ENV || 'development'}`);
 });
